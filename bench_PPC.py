@@ -46,8 +46,12 @@ parser.add_argument('-c', '--compressor', nargs='+', default=['zstd'],
                          'See doc for how to pass options to a compressor')
 
 parser.add_argument('-p', '--permuter', nargs='+', default=['filename'],
-                    choices=['random', 'list', 'filename', 'filename-path', 'tlshsort', 'ssdeepsort',
-                             'simhashsort', 'minhashgraph', 'typemagika', 'typeminhashgraph', 'typemagikaminhashgraph', 'lengthsort', 'typemagikatlshsort', 'all'],
+                    choices=[
+                        'random', 'list', 'filename', 'filename-path', 'tlshsort', 'ssdeepsort', 'simhashsort',
+                        'minhashgraph', 'typemagika', 'typeminhashgraph', 'typemagikaminhashgraph', 'lengthsort',
+                        'typemagikatlshsort', 'icf_tlsh_single_sort', 'icf_single_sort', 'icf_multi_sort',
+                        'cf_single_sort', 'ocf_single_sort', 'oicf_single_sort', 'all'
+                    ],
                     help='Permutation strategies, one or more of the following:\n'
                     '* random: Permute blobs randomly\n'
                     '* lengthsort: Sort blobs according to legth\n'
@@ -468,7 +472,7 @@ if __name__ == "__main__":
 
                 if permuter == 'typemagikaminhashgraph':
                     start_time = time.time()
-                    
+
                     ordered_rows = hybrid_type_1guess(
                         df, guess_fun_magika_from_bytes, row_minhashgraph_unionfind_fun, input_dir)
                     technique_name = 'typemagikaminhashgraph'
@@ -479,6 +483,76 @@ if __name__ == "__main__":
                             arg_block_size)
                         compress_decompress_from_df(ordered_rows,
                                                     technique_name, dataset_name, df, compressor, sorting_time, block_size_in_bytes, arg_block_size, 'None', args)
+
+                if permuter == 'icf-tlsh':
+                    start_time = time.time()
+                    ordered_rows = TLSH_names_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'icf_tlsh_single_sort':
+                    start_time = time.time()
+                    ordered_rows = icf_tlsh_single_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'icf_single_sort':
+                    start_time = time.time()
+                    ordered_rows = icf_single_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'icf_multi_sort':
+                    start_time = time.time()
+                    ordered_rows = icf_multi_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'cf_single_sort':
+                    start_time = time.time()
+                    ordered_rows = cf_single_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'ocf_single_sort':
+                    start_time = time.time()
+                    ordered_rows = ocf_single_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
+
+                if permuter == 'oicf_single_sort':
+                    start_time = time.time()
+                    ordered_rows = oicf_single_sort(df, input_dir)
+                    sorting_time = time.time() - start_time
+
+                    for arg_block_size in args.block_size:
+                        compress_decompress_from_df(
+                            ordered_rows, permuter, dataset_name, df, compressor, sorting_time,
+                            from_block_size_to_bytes(arg_block_size), arg_block_size, '', args)
 
     print('')
     print("# Ending time : ", time.strftime(

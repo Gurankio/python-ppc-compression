@@ -1,3 +1,5 @@
+import itertools
+import re
 import subprocess
 import os
 import numpy as np
@@ -722,6 +724,186 @@ def TLSH_sort(df, input_dir):
     return LSH_0
 
 
+def icf_tlsh_single_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    LSH = []
+
+    pattern = re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        # read all lines at once
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+        # chunk = read_file_size(path_file, 2 ** 16)
+
+        # Get only the names
+        names = b' '.join(b''.join(match) for match in pattern.findall(chunk))
+        # print(all_of_it)
+
+        # https://documents.trendmicro.com/assets/wp/wp-locality-sensitive-hash.pdf
+        # Byte[0] = 'T'
+        # Byte[1] = '1'
+        # Byte[2]Byte[3] = chechsum
+        # Byte[4]Byte[5] = log(lenght)
+        # Byte[6]Byte[7] = constructed out of two 16 bit quantities derived from the quartiles: q1, q2 and q3
+        lshash = tlsh.hash(names)[8:]
+        # print(lshash)
+        LSH.append([index, lshash])
+
+    for row in range(num_blobs):
+        path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+        # We skip the really few big files (<4MiB), that are going to be compressed togheter
+        if int(df.iloc[row]['length']) < 2 ** 22:
+            compute_one_tlsh(row, path_file)
+        else:
+            LSH.append([row, '0'])
+
+    LSH.sort(key=lambda x: x[1])
+    LSH_0 = [item[0] for item in LSH]
+
+    # assert (check_is_permutation(LSH_0, num_blobs))
+    return LSH_0
+
+
+def icf_single_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    mapping = []
+
+    pattern = re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        # read all lines at once
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+
+        # Get only the names
+        names = b' '.join(b''.join(match) for match in pattern.findall(chunk))
+
+        mapping.append([index, names])
+
+    for row in range(num_blobs):
+        path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+        compute_one_tlsh(row, path_file)
+
+    mapping.sort(key=lambda x: x[1])
+    mapping_0 = [item[0] for item in mapping]
+
+    # assert (check_is_permutation(mapping_0, num_blobs))
+    return mapping_0
+
+
+def oicf_single_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    mapping = []
+
+    pattern = re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        # read all lines at once
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+
+        # Get only the names
+        names = tuple(sorted(b''.join(match) for match in pattern.findall(chunk)))
+
+        mapping.append([index, names])
+
+    for row in range(num_blobs):
+        path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+        compute_one_tlsh(row, path_file)
+
+    mapping.sort(key=lambda x: x[1])
+    mapping_0 = [item[0] for item in mapping]
+
+    # assert (check_is_permutation(mapping_0, num_blobs))
+    return mapping_0
+
+
+def icf_multi_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    mapping = []
+
+    pattern = re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        # read all lines at once
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+
+        # Get only the names
+        names = b' '.join(b''.join(match) for match in pattern.findall(chunk))
+
+        mapping.append([index, names])
+
+    with ThreadPoolExecutor(NUM_THREAD) as executor:
+        for row in range(num_blobs):
+            path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+            executor.submit(compute_one_tlsh, row, path_file)
+
+    mapping.sort(key=lambda x: x[1])
+    mapping_0 = [item[0] for item in mapping]
+
+    # assert (check_is_permutation(mapping_0, num_blobs))
+    return mapping_0
+
+
+def cf_single_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    mapping = []
+
+    pattern = re.compile(rb'class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+
+        # Get only the names
+        names = b' '.join(b''.join(match) for match in pattern.findall(chunk))
+
+        mapping.append([index, names])
+
+    for row in range(num_blobs):
+        path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+        compute_one_tlsh(row, path_file)
+
+    mapping.sort(key=lambda x: x[1])
+    mapping_0 = [item[0] for item in mapping]
+
+    # assert (check_is_permutation(mapping_0, num_blobs))
+    return mapping_0
+
+
+def ocf_single_sort(df, input_dir):
+    num_blobs = len(df.index)
+    # LSH = [[0, 0] for _ in range(num_blobs)]
+    mapping = []
+
+    pattern = re.compile(rb'class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+
+    def compute_one_tlsh(index, path_file):
+        with open(path_file, mode='rb') as file:
+            chunk = file.read(2 ** 16)
+
+        # Get only the names
+        names = tuple(sorted(b''.join(match) for match in pattern.findall(chunk)))
+
+        mapping.append([index, names])
+
+    for row in range(num_blobs):
+        path_file = os.path.join(input_dir, df.iloc[row]['local_path'], df.iloc[row]['file_id'])
+        compute_one_tlsh(row, path_file)
+
+    mapping.sort(key=lambda x: x[1])
+    mapping_0 = [item[0] for item in mapping]
+
+    # assert (check_is_permutation(mapping_0, num_blobs))
+    return mapping_0
+
 if sys.version_info < (3, 9):
     # Examples ssdeep hash
     # 24:X+cL58FKrmjNj5byfOkHhylUHTbVeJORhPjZRUkPH2hQ29utFgmOfdr8OkCZ:uEU2gN1byJHcMlj4AWhb2gvfdrtkS
@@ -1027,8 +1209,7 @@ def hybrid_type_1guess(df, guessing_fun1, row_sorting_fun, input_dir):
             lock.release()
 
         for index in range(num_blobs):
-            file_path = os.path.join(
-                input_dir, df.iloc[index]['local_path'], df.iloc[index]['file_id'])
+            file_path = os.path.join(input_dir, df.iloc[index]['local_path'], df.iloc[index]['file_id'])
             file_size = int(df.iloc[index]['length'])
             executor.submit(compute_one_file_type, file_path, file_size, index)
             # compute_one_file_type(file_path, file_size, index)
