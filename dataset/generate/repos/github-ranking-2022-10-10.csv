@@ -597,7 +597,7 @@ rank,item,repo_name,stars,forks,language,repo_url,username,commits_count,last_co
 96,Java,platform_frameworks_base,10130,6165,Java,https://github.com/aosp-mirror/platform_frameworks_base,aosp-mirror,766804,eaae36cf0aa8c33dbb06cd7f2b860cf4963d0e4e,
 97,Java,grpc-java,10070,3470,Java,https://github.com/grpc/grpc-java,grpc,5577,fe8f474055054240fc68317fa3bb614c29e1df1c,The Java gRPC implementation. HTTP/2 based RPC
 98,Java,javapoet,9852,1289,Java,https://github.com/square/javapoet,square,871,86d478ba7c9c8aa815e05caec18e23a119519ca5,A Java API for generating .java source files.
-99,Java,cas,9748,3808,Java,https://github.com/apereo/cas,apereo,21900,e9090bb128a6aaaebc6f23c138b4b8896ec21219,Apereo CAS - Identity & Single Sign On for all earthlings and beyond.
+99,Java,cas,9748,3808,Java,https://github.com/apereo/cas,apereo,21900,e9090bb128a6aaaebc6f23c138b4b8896ec21219,Apereo CAS - IdentityPermuter & Single Sign On for all earthlings and beyond.
 100,Java,Fragmentation,9732,2150,Java,https://github.com/YoKeyword/Fragmentation,YoKeyword,612,0394930a3e2368f210df31f2632fb89b9c44e121,[DEPRECATED] A powerful library that manage Fragment for Android
 1,TypeScript,freeCodeCamp,355116,29941,TypeScript,https://github.com/freeCodeCamp/freeCodeCamp,freeCodeCamp,31599,17ba24031341411860a30edfe88d9c1700ab33fd,freeCodeCamp.org's open-source codebase and curriculum. Learn to code for free.
 2,TypeScript,developer-roadmap,214365,30800,TypeScript,https://github.com/kamranahmedse/developer-roadmap,kamranahmedse,1993,1c66c2a25586ba4e6529edd2d2d45d337cac34af,"Interactive roadmaps, guides and other educational content to help developers grow in their careers."
