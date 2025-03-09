@@ -45,7 +45,7 @@ ARCHIVES_LOCATION = 'https://pages.di.unipi.it/boffa/swh_endpoint'
 def exec_cmd_bool(cmd):
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     process.wait()
-    output = process.communicate()
+    output, _ = process.communicate()
     if process.returncode == 0:
         print('[OK]' + output.decode('utf-8'))
         return True
