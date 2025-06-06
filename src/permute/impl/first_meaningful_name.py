@@ -6,17 +6,22 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Iterable
 
+import tlsh
 from pandas import DataFrame
 
 from permute.permuter import ParallelPermuter
 
 
 @dataclasses.dataclass(frozen=True)
-class BaseMeaningfulNamesPermuter(ParallelPermuter, ABC):
+class BaseFirstMeaningfulNamePermuter(ParallelPermuter, ABC):
     chunk_size: int
 
     @abstractmethod
     def pattern(self) -> re.Pattern:
+        ...
+
+    @abstractmethod
+    def language_index(self, index: int) -> str:
         ...
 
     def prepare(self, df: DataFrame) -> tuple[list[tuple[int, int]], typing.Callable[[int, Path, int], None]]:
@@ -24,23 +29,21 @@ class BaseMeaningfulNamesPermuter(ParallelPermuter, ABC):
         lock = threading.Lock()
         pattern = self.pattern()
 
-        if pattern.groups == 1:
-            def joiner(matches):
-                return tuple(matches)
-        else:
-            def joiner(matches):
-                return tuple(b''.join(match) for match in matches)
-
         def compute_one(index, path, size):
             with open(path, mode='rb') as file:
                 chunk = file.read(min(size, self.chunk_size))
 
             # Get only the names
-            matches = pattern.findall(chunk)
-            names = joiner(matches)
+            match = next(map(lambda m: m.groups(), pattern.finditer(chunk)), tuple())
+            match = next(((self.language_index(i), x) for i, x in enumerate(match) if x is not None), None)
+
+            if match is None:
+                # print(f'{df.iloc[index]['filename']:30}',
+                #       df.iloc[index]['local_path'] + '/' + df.iloc[index]['file_id'])
+                match = ('zzz_tlsh', tlsh.hash(chunk)[8:])
 
             lock.acquire()
-            mapping.append([index, names])
+            mapping.append([index, match])
             lock.release()
 
         # assert (check_is_permutation(mapping_0, num_blobs))
@@ -51,19 +54,32 @@ class BaseMeaningfulNamesPermuter(ParallelPermuter, ABC):
         return [item[0] for item in temp]
 
 
-# class ClassNamesPermuter(BaseMeaningfulNamesPermuter):
-#     """
-#     Sorts blobs by the class names they contain.
-#     """
-#
-#     def pattern(self) -> re.Pattern:
-#         return re.compile(rb'class\s+(\S+?)[:(]')
-
-
-class ClassFunctionNamesPermuter(BaseMeaningfulNamesPermuter):
+class FirstClassFunctionNamePermuter(BaseFirstMeaningfulNamePermuter):
     """
     Sorts blobs by class or function names they contain.
     """
+
+    LANGUAGES = {
+        0: 'py',
+        1: 'py',
+        2: 'js',
+        3: 'js',
+        4: 'java',
+        5: 'cpp',
+        6: 'md',
+        7: 'html',
+        8: 'json',
+        9: 'c',
+        10: 'c',
+        11: 'ts',
+        12: 'xml',
+        13: 'js',
+        14: 'css',
+        15: 'php',
+    }
+
+    def language_index(self, index: int) -> str:
+        return self.LANGUAGES[index]
 
     def pattern(self) -> re.Pattern:
         return re.compile(
@@ -85,12 +101,3 @@ class ClassFunctionNamesPermuter(BaseMeaningfulNamesPermuter):
             rb'<\?php.+?(?:class|interface)\s+(\S+?)',
             re.DOTALL
         )
-
-
-# class ImportClassFunctionNamesPermuter(BaseMeaningfulNamesPermuter):
-#     """
-#     Sorts blobs by import, class or function names they contain.
-#     """
-#
-#     def pattern(self) -> re.Pattern:
-#         return re.compile(rb'import\s+(\S.+?)|class\s+(\S+?)[:(]|def\s+(\S+?)\(.*?\):')

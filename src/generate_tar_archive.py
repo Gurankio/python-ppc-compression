@@ -1,6 +1,7 @@
 import numbers
 import os
 import shutil
+import subprocess
 import sys
 import time
 from concurrent.futures.thread import ThreadPoolExecutor
@@ -75,16 +76,18 @@ def compress_decompress_single_from_df(ordered_rows, technique_name, dataset_nam
     # Workaround: using script
     # Parallelism is archived by the compressor
     tar = 'gtar' if platform == 'darwin' else 'tar'
-    to_exec = (f"{tar}"
-               f" -cf {generated_path}"
-               f" -C {input_dir}"
-               f" -T {list_files_path}"
-               f" -I{chosen_compressor}"
-               f" --owner=0 --group=0 "
-               f"--no-same-owner --no-same-permissions")
+
+    to_exec = [
+        tar,
+        '-cf', f'{generated_path!s}',
+        '-C', f'{input_dir!s}',
+        '-T', f'{list_files_path!s}',
+        '-I', f'{chosen_compressor!s}',
+        '--owner=0', '--group=0', '--no-same-owner', '--no-same-permissions'
+    ]
 
     start_time = time.time()
-    exec_cmd(to_exec)
+    subprocess.run(to_exec)
     compression_time = time.time() - start_time
     compressed_size = int(os.path.getsize(generated_path))
 
@@ -108,8 +111,7 @@ def compress_decompress_single_from_df(ordered_rows, technique_name, dataset_nam
             work_path.unlink(missing_ok=True)
 
     except Exception as e:
-        print(f"Could not remove generated file.\n"
-              f"{e}")
+        print(f"Could not remove generated file.\n{e}")
 
     # ('DATASET,NUM_FILES,TOTAL_SIZE(GiB),AVG_FILE_SIZE(KiB),MEDIAN_FILE_SIZE(KiB),TECHNIQUE,COMPRESSION_RATIO(%),ORDERING_TIME(s),COMPRESSION_TIME(s),COMPRESSION_SPEED(MiB/s),DECOMPRESSION_SPEED(MiB/s),COMMIT_HASH,NOTES')
     print(

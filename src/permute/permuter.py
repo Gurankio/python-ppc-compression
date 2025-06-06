@@ -38,12 +38,12 @@ class ParallelPermuter[T](Permuter):
                 size = int(df.iloc[row]['length'])
                 compute_one(row, path, size)
 
-        return self.reduce(temp)
+        return self.reduce(temp, df, input_dir)
 
     @abstractmethod
     def prepare(self, df: DataFrame) -> tuple[T, typing.Callable[[int, Path, int], None]]:
         ...
 
     @abstractmethod
-    def reduce(self, temp: T) -> Iterable[int]:
+    def reduce(self, temp: T, df: DataFrame, input_dir: Path) -> Iterable[int]:
         ...

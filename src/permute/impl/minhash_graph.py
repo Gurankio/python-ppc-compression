@@ -1,4 +1,5 @@
 import dataclasses
+import threading
 import typing
 from pathlib import Path
 from typing import Iterable
@@ -15,7 +16,7 @@ from utils.unionfind import UnionFind
 @dataclasses.dataclass(frozen=True)
 class MinHashGraph(ParallelPermuter, Tokenizer):
     """
-
+    Sort blobs by minhash graph.
     """
     f: int
     r: int
@@ -24,6 +25,7 @@ class MinHashGraph(ParallelPermuter, Tokenizer):
 
     def prepare(self, df: DataFrame) -> tuple[..., typing.Callable[[int, Path, int], None]]:
         LSH_tuple = []
+        lock = threading.Lock()
 
         # TODO: what if r doesn't divide f
         #       just dont consider the rest
@@ -40,7 +42,9 @@ class MinHashGraph(ParallelPermuter, Tokenizer):
                         curr_band.append([symbol])
                     curr_tuple.append(curr_band)
 
+                lock.acquire()
                 LSH_tuple.append(curr_tuple)
+                lock.release()
 
             else:
                 m1 = MinHash(num_perm=self.f)
@@ -57,12 +61,15 @@ class MinHashGraph(ParallelPermuter, Tokenizer):
 
                     curr_tuple.append(curr_band)
 
+                lock.acquire()
                 LSH_tuple.append(curr_tuple)
+                lock.release()
 
-        return (len(df.index), df, LSH_tuple), add_tuple_one_file
+        return LSH_tuple, add_tuple_one_file
 
-    def reduce(self, temp) -> Iterable[int]:
-        num_blobs, df, LSH_tuple = temp
+    def reduce(self, temp, df: DataFrame, input_dir: Path) -> Iterable[int]:
+        LSH_tuple = temp
+        num_blobs = len(df.index)
 
         uf = UnionFind(range(num_blobs))
 
@@ -84,7 +91,7 @@ class MinHashGraph(ParallelPermuter, Tokenizer):
             list_connected_component = list(connected_component)
             if (byte_size_list_rows(df, list_connected_component) > 32 * (2 ** 20)
                     and len(list_connected_component) > 5):
-                sorted_row_list = tlsh_sort_list(df, connected_component, input_dir=input_dir)
+                sorted_row_list = tlsh_sort_list(df, connected_component, input_dir)
                 row_list.extend(sorted_row_list)
             else:
                 row_list.extend(sorted(list_connected_component,

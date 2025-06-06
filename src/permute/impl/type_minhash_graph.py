@@ -4,8 +4,9 @@ from typing import Any, Callable, Iterable
 
 from pandas import DataFrame
 
+from permute.permuter import ParallelPermuter
 from utils.generic import byte_size_list_rows, row_minhashgraph_unionfind_fun
-
+import magic
 
 class TypeMinHashGraphPermuter(ParallelPermuter):
     @cached_property

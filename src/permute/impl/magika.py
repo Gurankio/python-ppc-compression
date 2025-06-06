@@ -59,16 +59,16 @@ class BaseMagikaPermuter(ParallelPermuter, ABC):
         return map_type_rows, compute_one_file_type
 
     @abstractmethod
-    def sort(self, df: DataFrame, row_list):
+    def sort(self, df: DataFrame, row_list, input_dir: Path):
         ...
 
-    def reduce(self, temp: dict) -> Iterable[int]:
+    def reduce(self, temp: dict, df: DataFrame, input_dir: Path) -> Iterable[int]:
         permutation = []
 
         for t, row_list in temp.items():
             if byte_size_list_rows(df, row_list) > (2 * (2 ** 20)) and len(row_list) > 3:
                 # TODO: input_dir=input_dir
-                tmp = self.sort(df=df, row_list=row_list)
+                tmp = self.sort(df, row_list, input_dir)
                 permutation.extend(tmp)
             else:
                 tmp = sorted(row_list, key=lambda x: int(df.iloc[x]['length']), reverse=True)
@@ -82,8 +82,7 @@ class MagikaPermuter(BaseMagikaPermuter):
     def guess(self, x: Path):
         return self.guess_from_bytes(x)
 
-    def sort(self, df: DataFrame, row_list):
-        # TODO: check
+    def sort(self, df: DataFrame, row_list, input_dir: Path):
         return row_list
 
 
@@ -92,8 +91,7 @@ class MagikaTlshSortPermuter(BaseMagikaPermuter):
     def guess(self, x: Path):
         return self.guess_from_bytes(x)
 
-    def sort(self, df: DataFrame, row_list):
-        # TODO: check
+    def sort(self, df: DataFrame, row_list, input_dir: Path):
         return tlsh_sort_list(df, row_list, input_dir)
 
 
@@ -102,6 +100,5 @@ class MagikaMinHashGraphPermuter(BaseMagikaPermuter):
     def guess(self, x: Path):
         return self.guess_from_bytes(x)
 
-    def sort(self, df: DataFrame, row_list):
-        # TODO: check
+    def sort(self, df: DataFrame, row_list, input_dir: Path):
         return row_minhashgraph_unionfind_fun(df, row_list, input_dir)

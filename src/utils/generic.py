@@ -10,7 +10,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-import spookyhash
 import tlsh
 from datasketch import MinHash
 from matplotlib import pyplot as plt
@@ -209,11 +208,12 @@ def simhash_graph_unionfind_list(df, row_list, shingle_num, f, r, len_limit, inp
     LSH_tuple = []
 
     if f == 128:
+        import spookyhash
+
         def add_tuple_one_file(path_file, index):
             all_of_it = read_file(path_file)
             features = get_tokens(all_of_it, shingle_num, len_limit)
-            lshash = Simhash(
-                features, hashfunc=spookyhash.hash128, f=f).value
+            lshash = Simhash(features, hashfunc=spookyhash.hash128, f=f).value
             if r == 4:
                 LSH_tuple.append([index,
                                   lshash & ones_32,
@@ -442,6 +442,8 @@ def simhash_graph_technique_unionfind(df, shingle_num, f, r, len_limit, input_di
     LSH_tuple = []
 
     if f == 128:
+        import spookyhash
+
         with ThreadPoolExecutor(NUM_THREAD) as executor:
             def add_tuple_one_file(path_file, index):
                 all_of_it = read_file(path_file)
@@ -674,6 +676,8 @@ def minhash_graph_technique_unionfind(df, shingle_num, f, r, len_limit, input_di
 
 
 def simhash_from_file(file_path, shingle_num, _f):
+    import spookyhash
+
     all_of_it = read_file(file_path)
     features = get_tokens(all_of_it, shingle_num)
     return Simhash(features, hashfunc=spookyhash.hash128, f=_f).value
@@ -741,8 +745,12 @@ def stats_simhash(df, shingle_num, _f, len_limit, input_dir):
         features = get_tokens(all_of_it, shingle_num, len_limit)
         lshash = 0
         if _f == 64:
+            import spookyhash
+
             lshash = Simhash(features, hashfunc=spookyhash.hash64, f=_f).sums
         elif _f == 128:
+            import spookyhash
+
             lshash = Simhash(features, hashfunc=spookyhash.hash128, f=_f).sums
         elif _f == 256:
             lshash = Simhash(features, hashfunc=mySHA256, f=_f).sums

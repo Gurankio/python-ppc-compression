@@ -1,9 +1,9 @@
 import dataclasses
+import threading
 import typing
 from pathlib import Path
 from typing import Iterable
 
-import spookyhash
 from pandas import DataFrame
 from simhash import Simhash
 
@@ -15,7 +15,7 @@ from utils.generic import mySHA256
 @dataclasses.dataclass(frozen=True)
 class SimHashSortPermuter(ParallelPermuter, Tokenizer):
     """
-    Sort blobs by filename and path.
+    Sort blobs by simhash.
     """
     f: int
     shingles: int
@@ -26,10 +26,14 @@ class SimHashSortPermuter(ParallelPermuter, Tokenizer):
 
         if self.f == 64:
             def lshasher(features):
+                import spookyhash
+
                 return Simhash(features, hashfunc=spookyhash.hash64, f=self.f).value
 
         if self.f == 128:
             def lshasher(features):
+                import spookyhash
+
                 return Simhash(features, hashfunc=spookyhash.hash128, f=self.f).value
 
         if self.f == 256:
@@ -39,6 +43,7 @@ class SimHashSortPermuter(ParallelPermuter, Tokenizer):
         assert lshasher is not None
 
         LSH = []
+        lock = threading.Lock()
 
         def compute_one(index: int, path: Path, size: int):
             # Check if size pf the file is < 1MiB
@@ -46,16 +51,16 @@ class SimHashSortPermuter(ParallelPermuter, Tokenizer):
                 features = self.tokenize(path.read_text(errors='ignore'), self.shingles, self.len_limit)
                 lshash = lshasher(features)
 
-                # lock.acquire()
+                lock.acquire()
                 LSH.append([index, lshash])
-                # lock.release()
+                lock.release()
             else:
-                # lock.acquire()
+                lock.acquire()
                 LSH.append([index, 0])
-                # lock.release()
+                lock.release()
 
         return LSH, compute_one
 
-    def reduce(self, temp: list[tuple[int, int]]) -> Iterable[int]:
+    def reduce(self, temp: list[tuple[int, int]], _df: DataFrame, _input_dir: Path) -> Iterable[int]:
         temp.sort(key=lambda x: x[1])
         return [item[0] for item in temp]
