@@ -10,6 +10,7 @@ from typing import Iterable, Any, Callable
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy
+import tlsh
 from pandas import DataFrame
 
 from permute.permuter import ParallelPermuter
@@ -17,11 +18,15 @@ from utils.unionfind import UnionFind
 
 
 @dataclasses.dataclass(frozen=True)
-class BaseMeaningfulNameGraphPermuter(ParallelPermuter, ABC):
+class BaseMeaningfulNameEmbedPermuter(ParallelPermuter, ABC):
     chunk_size: int
 
     @abstractmethod
     def pattern(self) -> re.Pattern:
+        ...
+
+    @abstractmethod
+    def language_index(self, index: int) -> str:
         ...
 
     def prepare(self, df: DataFrame) -> tuple[dict[Any, Any], Callable[[Any, Any, Any], None]]:
@@ -29,12 +34,12 @@ class BaseMeaningfulNameGraphPermuter(ParallelPermuter, ABC):
         lock = threading.Lock()
         pattern = self.pattern()
 
-        if pattern.groups == 1:
-            def joiner(matches):
-                return tuple(matches)
-        else:
-            def joiner(matches):
-                return tuple(b''.join(match) for match in matches)
+        def joiner(matches):
+            def inner():
+                for match in matches:
+                    yield from ((self.language_index(i), x) for i, x in enumerate(match) if x is not None)
+
+            return tuple(set(inner()))
 
         def compute_one(index, path, size):
             with open(path, mode='rb') as file:
@@ -64,42 +69,26 @@ class BaseMeaningfulNameGraphPermuter(ParallelPermuter, ABC):
         print(f'  Inverted            @ {time():.3f}')
         print(f'  (assumption: #terms >> #files -> {len(inverse)} >> {len(temp)})')
 
-        low, high = 5, 100  # TODO: maybe re-add: numpy.percentile(nfiles, 50) or numpy.percentile(nfiles, 95)
-
-        uf = UnionFind(range(len(temp.keys())))
-        for file, terms in temp.items():
-            for term in terms:
-                if not (low <= len(inverse[term]) <= high):
-                    continue
-
-                for other in inverse[term]:
-                    uf.union(file, other)
-
-        print(f'  CC                  @ {time():.3f}')
-        print(f'  (assumption: #CC ~ #files -> {uf.n_comps} ~ {len(temp)}, {len(temp) / uf.n_comps:.1f} file per CC)')
-
-        inverse_sorted = list(sorted(inverse.values(), key=len, reverse=True)[:4096])
+        inverse_sorted = list(sorted(inverse.values(), key=len, reverse=True)[:8192])
         print(f'  Sorted terms        @ {time():.3f}')
 
         embedding = {}
         lock = threading.Lock()
 
-        def make_embed(c):
-            e = tuple(any(f in fs for f in c) for fs in inverse_sorted)
+        def make_embed(f, ts):
+            e = tuple(t in ts for t in inverse_sorted)
             with lock:
-                embedding[c] = e
-
-        frozen_comps = [frozenset(comp) for comp in uf.components()]
+                embedding[f] = e
 
         with ThreadPoolExecutor(16) as executor:
-            for comp in frozen_comps:
-                executor.submit(make_embed, comp)
-        print(f'  Built CC embeddings @ {time():.3f}')
+            for file, terms in temp.items():
+                executor.submit(make_embed, file, terms)
+        print(f'  Built file embeddings @ {time():.3f}')
 
-        output = sorted(frozen_comps, key=lambda f: embedding[f])
-        print(f'  Sorted CCs          @ {time():.3f}')
+        output = sorted(temp.keys(), key=lambda f: embedding[f], reverse=True)
+        print(f'  Sorted files          @ {time():.3f}')
 
-        return list(chain(*output))
+        return output
 
     # v2: high freq
     # def reduce(self, temp: dict[int, list[bytes]], _df: DataFrame, _input_dir: Path) -> Iterable[int]:
@@ -134,28 +123,68 @@ class BaseMeaningfulNameGraphPermuter(ParallelPermuter, ABC):
 
     # v1: low freq, with UnionFind not reported, but did terribly.
 
-class ClassNameGraphPermuter(BaseMeaningfulNameGraphPermuter):
-    """
-    Sorts blobs by the class names they contain.
-    """
 
-    def pattern(self) -> re.Pattern:
-        return re.compile(rb'class\s+(\S+?):')
+# class ClassNameGraphPermuter(BaseMeaningfulNameGraphPermuter):
+#     """
+#     Sorts blobs by the class names they contain.
+#     """
+#
+#     def pattern(self) -> re.Pattern:
+#         return re.compile(rb'class\s+(\S+?):')
 
 
-class ClassFunctionNameGraphPermuter(BaseMeaningfulNameGraphPermuter):
+class ClassFunctionNameEmbedPermuter(BaseMeaningfulNameEmbedPermuter):
     """
     Sorts blobs by class or function names they contain.
     """
 
+    LANGUAGES = {
+        0: 'py',
+        1: 'py',
+        2: 'js',
+        3: 'js',
+        4: 'java',
+        5: 'cpp',
+        6: 'md',
+        7: 'html',
+        8: 'json',
+        9: 'c',
+        10: 'c',
+        11: 'ts',
+        12: 'xml',
+        13: 'js',
+        14: 'css',
+        15: 'php',
+    }
+
+    def language_index(self, index: int) -> str:
+        return self.LANGUAGES[index]
+
     def pattern(self) -> re.Pattern:
-        return re.compile(rb'class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+        return re.compile(
+            rb'class\s+(\S+?):|'
+            rb'def\s+(\S+?)\(.*?\):|'
+            rb'class\s+(\S+?)\s*(?:extends.+?)?\s*{|'
+            rb'function\s+(\S+?)\(.*?\)\s+{|'
+            rb'public\s+(?:final\s+)?class\s+(\S+?)\s*(?:extends.+?|implements.+?)?\s*{|'
+            rb'public\s+class\s+(\S+?)\s+{.*?(?:public|private):|'
+            rb'#+\s*(.+?)|'
+            rb'<title>(.+?)</title>|'
+            rb'(\".+?\":)\s*[\"\[{]|'
+            rb'@file\s+(.+?).c|'  # doc comment
+            rb'struct\s+(\S+?)\s+{|'
+            rb'export\s+const\s+(\S.+?)\s*[:=]|'
+            rb'xmlns(?::.+?)?=\"(.+?)\"|'
+            rb'(?:var|const)\s+(\S+?)\s*=\s*function|'
+            rb'\.(\S+?)\s*{|'
+            rb'<\?php.+?(?:class|interface)\s+(\S+?)',
+            re.DOTALL
+        )
 
-
-class ImportClassFunctionNameGraphPermuter(BaseMeaningfulNameGraphPermuter):
-    """
-    Sorts blobs by import, class or function names they contain.
-    """
-
-    def pattern(self) -> re.Pattern:
-        return re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')
+# class ImportClassFunctionNameGraphPermuter(BaseMeaningfulNameGraphPermuter):
+#     """
+#     Sorts blobs by import, class or function names they contain.
+#     """
+#
+#     def pattern(self) -> re.Pattern:
+#         return re.compile(rb'import\s+(\S.+?)|class\s+(\S+?):|def\s+(\S+?)\(.*?\):')

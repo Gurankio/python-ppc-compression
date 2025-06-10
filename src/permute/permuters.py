@@ -2,10 +2,11 @@ import textwrap
 from abc import ABCMeta, ABC
 from enum import EnumMeta, Enum
 
+from permute.impl.embed_meaningful_names import ClassFunctionNameEmbedPermuter
 from permute.impl.filename import FilenamePermuter
 from permute.impl.filename_path import FilenamePathPermuter
 from permute.impl.first_meaningful_name import FirstClassFunctionNamePermuter
-from permute.impl.meaningful_filtered import ClassFunctionNameGraphPermuter
+from permute.impl.graph_meaningful_names import ClassFunctionNameGraphPermuter
 from permute.impl.meaningful_simhash import ClassFunctionSimHashPermuter, ImportClassFunctionSimHashPermuter, \
     ClassSimHashPermuter
 from permute.permuter import Permuter
@@ -36,6 +37,8 @@ class Permuters(Permuter, ABC, Enum, metaclass=ABCEnumMeta):
     FIRST_CF_NAME = FirstClassFunctionNamePermuter(2 ** 12)
 
     CF_NAME_GRAPH = ClassFunctionNameGraphPermuter(2 ** 16)
+
+    CF_NAMES_EMBED = ClassFunctionNameEmbedPermuter(2 ** 16)
 
     C_SIMHASH_SORT = ClassSimHashPermuter(2 ** 16, 256, 1, 10)
     CF_SIMHASH_SORT = ClassFunctionSimHashPermuter(2 ** 16, 256, 1, 10)
